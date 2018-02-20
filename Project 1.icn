@@ -1,0 +1,367 @@
+# Kinga Kaczmarczyk
+# II rok, IV semestr Informatyka IEiT
+# Programowanie w jezyku Icon
+
+##########
+#WERSJA 1 : szybko oblicza zminimalizowana funkcje, ale wypisujac wypisuje ja tylko za pomoca &,|,~  : main do pierwszej wersji: zmienic na goToReduce
+#WERSJA 2 : chyba najbardziej minimalizuje, ale bardzo duzo czasu jej to zajmuje przy skomplikowanych wyrazeniach : main do drugiej wersji: zmienic na goToReduce2
+
+procedure main()
+	L:=set()
+	t:=[]
+	while linia:= read() do {
+		push(t,linia)  
+		insert(L,linia) #umieszczenie wejscia w zmiennej
+	}
+	#writeOut(t) ; write()
+	#writeOut(L) ; write()
+	L2:=goToReduce2(t) #sprawdzenie poprawnosci danych wejsciowych, usuniecie spacji i ewentualne przejscie do redukcji
+	writeOut(L2) ; write()
+end
+
+##########
+#funkcje dla obu wersji
+
+procedure writeOut(L) #wypisuje zbior
+  every i:=!L do write(i)
+end
+
+procedure onp(line)
+	while line?:=2(="(", tab(bal(")")), pos(-1)) #pozbywam sie zbednych nawiasow
+	every x:=bal(">", , ,line) #wyodrebnienie operatora o najnizszym prorytecie tak ze w x mamy wskaznik na miejsce gdzie sie pojawil
+	if \x then return onp(line[1:x]) || onp(line[x+1:0]) || line[x] #gdy jest non-null value to laczymy czesci wyrazenie
+	every x:=bal("&|", , ,line) 
+	if \x then return onp(line[1:x]) || onp(line[x+1:0]) || line[x]
+	every x:=bal("^", , ,line) 
+	if \x then return onp(line[1:x]) || onp(line[x+1:0]) || line[x]
+	every x:=bal("~", , ,line) 
+	if \x then return onp(line[1:x]) || onp(line[x+1:0]) || line[x]
+	if line[1]=="~" then return line[2:0]||"~" #gdy na pierwszym miejscu jest ~ to dajemy ja na koniec koniec wyrazenia
+	return line
+end 
+
+procedure toBinary(number) #generowanie ciagow 01
+	if number=0 then suspend ""
+	else suspend !"01" || toBinary(number-1) #wybiera licze 0 lub 1 i dolacza do nastepnej rekurencyjnei az utworzy sie ciag o dlugosci number
+end 
+
+procedure solveExpression(line,arg)
+	line:=map(line,cset(line)**&lcase,arg) #zamiana stringa zmiennych na ciag 0,1 i znaki wyrazen algebraicznych
+	stack:=[]
+	every i:=!line do {
+		if i=="F" then i:=0 #F to stala 0
+		if i=="T" then i:=1 #T to stala 1
+		if i==("0"|"1") then push(stack,i) #kazde 0,1 odkladamy na stos
+		else case i of { #wyniki operacji trafiaja na stos
+			"&": push(stack,iand(pop(stack),pop(stack))) #koniunkcja dwoch wartosci ze stosu
+			"|": push(stack,ior(pop(stack),pop(stack))) #alternatywa dwoch wartosci ze stosu
+			">": push(stack,ior(pop(stack),1-pop(stack))) #implikacja dwoch wartosci ze stosu
+			"~": push(stack,1-pop(stack)) #zaprzeczenie jednej wartosci ze stosu
+			"^": push(stack,ixor(pop(stack),pop(stack))) #xor dwoch wartosci ze stosu
+		}
+	}
+	return pop(stack) #ostatnia wartosc to wynik
+end
+
+procedure check(line)
+	newLine:=""
+	every i:=1 to *line do {
+		if line[i]==("T" | "F" | "~" | "^" | "&" | "|" | ">" | "(" | ")" | " ") then { #sprawdza czy jest jednym z dostepnych znakow
+			if line[i]~==" " then newLine||:=line[i] #jezeli nei jest spacja to wpisuje do nowej lini (tak sa redukowane spacje)
+		}
+		else {
+			wasError:=1 #pomocnicza zmienna ktora mowi czy byl jakis niechciany znak
+			every j:=97 to 122 do { #sprawdza czy znak jest litera od a do z
+				if line[i]==char(j) then {
+					newLine||:=line[i] 
+					wasError:=0
+				}
+			}
+ 			if wasError==1 then { #jezeli to nei jest poprawne wyrazenie to odrazu wypisze error
+				newLine:="ERROR" 
+				break
+			}
+		}
+	}
+	return newLine
+end
+
+##########
+#funkcje dla wersji 1
+
+procedure combine(v1,v2)
+  r:=0
+  every i:=1 to *v1 do
+    if v1[i]~==v2[i] then {
+		r+:=1
+		v1[i]:="-"
+	}
+  if r=1 then return v1
+end
+
+procedure QuineMcCluskey(L)
+  L2:=set()
+  a:=0
+  every v1:=!L do {
+    b:=0
+    every v2:=!L do
+      if insert(L2,combine(v1,v2)) then b:=a:=1
+    if b=0 then insert(L2,v1)
+  }
+  return if a=0 then L2 else QuineMcCluskey(L2)
+end
+
+procedure array(i,j,x)
+	tab:=list(i)
+	every !tab:=list(j,x)
+	return tab
+end
+
+procedure match(a,b)
+	every i:=1 to *a do {
+		if (a[i]~==b[i]) & (b[i]~=="-") then return 0 #ciagi pasuja do siebie gdy na tyych samych miejscach maja 0 i 1 lub -
+	}
+	return 1
+end
+
+procedure size(S) #zwraca rozmiar zbioru
+	i:=0
+	every !S do 
+		i:=i+1
+	return i
+end
+
+procedure createTable(L,M)
+	tab:=array(size(M)+1,size(L)+1,0) #tworzenie tablicy dwuwymiarowej
+	i:=2
+	every v:=!L do { #w pierwszym wierszu zapisanie ciagow 01 stworzonych do algorytmu QuineMcCluskey
+		tab[1][i]:= v
+		i:=i+1
+	}
+	i:=2
+	every w:=!M do { #w kolumnie zapisanie ciagow -01 zredukowanych wczesniejszych ciagow 01
+		tab[i][1]:= w
+		i:=i+1
+	}
+	every i:=2 to size(M)+1 do {
+		every j:=2 to size(L)+1 do {
+			if match(tab[1][j],tab[i][1])==1 then tab[i][j]:=1 #przypisanie 1, gdy ciagi z wiersza i kolumny pasuja do siebie
+			else tab[i][j]:=0 #0, gdy nie pasuja
+		}
+	}
+	return tab #zwraca przygotowana tablice
+end
+
+procedure allSubsets(n)
+	Mask:=set()
+	Result:=set()
+	every v:=toBinary(n) do 
+		insert(Mask,v) #maska binarna
+	every v:=!Mask do {
+		subset:=""
+		every i:=1 to *v do
+			if v[i]=="1" then subset||:=string(i+1) #jezeli w masce jest 1 to dajemy te liczbe do podzbioru jako string
+		if subset~=="" then insert(Result,subset)
+	}
+	return Result #zwraca liczbe wszystkich podzbiorow oprocz pustego
+end
+
+procedure minimalise(tab,L,M)
+	S:=allSubsets(size(M)) #generuje wszystkie podzbiory jakie mozna utworzyc z ilosci wierszy - 1
+	Result:=set()
+	ok:=0
+	every v:=!S do { #po kolei kazdy podzbior
+		ok:=0
+		every i:=2 to size(L)+1 do { #kazda kolumna
+			ok:=0
+			every j:=1 to *v do #kazdy numer wiersza z podzbioru
+				if tab[integer(v[j])][i]==1 then ok:=1 #sprawdzamy czy w okreslonym miejscu w tabeli jest 1 jak tak to moze byc potencjalna minimalizacja
+			if ok==0 then break #jezeli nie pojawia sie ktoras z opcji w kolumnie to ten podzbior nie odzwierciedla wyrazenia 
+		}
+		if ok==1 then insert(Result,v) #jezeli moze byc potencjalnym wyrazeniem to dodajemy podzbior wierszy
+	}
+	return Result
+end
+
+procedure makeExpression(L,letters) #tu ma powstac funkcja wypisujaca wyrazenie
+	wyr:=""
+	every v:=!L do {
+		#write(letters)
+		sum:=0
+		every i:=1 to *v do {
+			if v[i]=="-" then sum:=sum+1
+		}
+		if sum~==*v-1 then wyr||:="("
+		every i:=1 to *v do {
+			if v[i]=="-" then next
+			if v[i]=="1" then wyr||:=letters[i]
+			if v[i]=="0" then wyr||:="~"||letters[i]
+			if i~=*v & v[i+1]~=="-" then wyr||:="&"
+		}
+		
+		if sum~==*v-1 then wyr||:=")"
+		wyr||:="|"
+	}
+	wyr:=wyr[1:*wyr]
+	return wyr
+end
+
+procedure findTheShortest(T) #znajduje najkrotsze rozwiazanie z podanych
+	min:=*(!T)
+	result:=!T
+	every v:=!T do {
+		if *v<min then {
+			min:=*v
+			result:=v
+		}
+	}
+	return result
+end
+
+procedure chooseTheBest(tab,L,M,N,line,letters)
+	T:=set()
+	every v:=!N do { #po kolei bierze kazde potencjalne wyrazenie wyrazone w 01
+		G:=set()
+		every i:=1 to *v do{
+			insert(G,tab[integer(v[i])][1])
+		}
+		#write("Zminimalizowana funkcja w binarnym przedstawieniu:") ; writeOut(G)
+		result:=makeExpression(G,letters) #zamienia 01 na wyrazenie algebraiczne
+		write(result)
+		insert(T,result)
+	}
+	insert(T,line) #wrzuca do rozwiazan wejscie (ono tez moze byc najkrotsze)
+	return findTheShortest(T)
+end
+
+procedure reduce(line)
+	firstLine:=line
+	line:=onp(line)
+	L:=set()
+	every i:=toBinary(*(line**&lcase)) do { #wytworzenie 0 i 1
+		if solveExpression(line,i)~==0 then insert(L,i) #jezeli wyrazenie bedzie mialo wartosc rozna od 0 to trafia do zbioru (bo moga byc tez wartosci neiznane)
+	}
+	M:=QuineMcCluskey(L) 
+	letters:=line**&lcase #litery z wyrazenia
+	table:=createTable(L,M) #stworzenie tabeli do zminimalizowania funkcji
+	N:=minimalise(table,L,M) #zawezenie kregu potencjalnych wyrazen
+	finalLine:=chooseTheBest(table,L,M,N,firstLine,letters)
+	return finalLine
+end
+
+procedure goToReduce(L)
+	newL:=set()
+	every line:=!L do { #przechodzenie po kazdym wyrazeniu
+		line2:=check(line) #sprawdzenie poprawnosci danych wejsciowych
+		if line2~=="ERROR" then line2:=reduce(line2) #jezeli to jest poprawne wyrazenie to przechodzimy do redukcji
+		write(line2)
+		insert(newL,line2)
+	}
+	return newL
+end
+
+##########
+#funkcje dla wersji 2
+
+procedure A() #rozpoznaje jezyk
+	suspend K() | K()||="|"||A()
+end 
+
+procedure K() 
+	suspend I() | I()||="&"||K() 
+end 
+
+procedure I() 
+	suspend X() | X()||=">"||I()
+end 
+
+procedure X()
+	suspend D() | D()||="^"||X()
+end
+
+procedure D() 
+	suspend (=(!&lcase | !"TF")) | (="("||A()||=")") | (="~"||A()) #sorawdza czy jest litera lub T lub F , lub moze nawiasami lub ~
+end 
+
+procedure check2(line) #sprawdza czy wyrazenie jest poprawne
+	if line? {A() & pos(0)} then return "1" else return "0" #dopasowywanie do wzorca
+end
+
+procedure generateExpression(number,setOfChars)
+	if number=0 then suspend "" #jak juz wykorzystamy wszystkie liczby no to wraca
+	else suspend !setOfChars || generateExpression(number-1,setOfChars) #pobiera znak z setOfChars i laczy go z kolejnym rekurencyjnie
+end 
+
+procedure equalExpressions(L,M)
+	if size(L)~==size(M) then return 0
+	every l:=!L do { #sprawdzamy kazdy wyraz zbioru
+		ok:=0
+		every m:=!M do {
+			if l==m then { #jak wyrazy obu zbiorow sa takie same to zaznaczmay zmienna pomocnicza
+				ok:=1
+				break
+			}
+		}
+		if ok==0 then return 0
+	}
+	return 1
+end
+
+procedure isEveryLetter(line,letters) #przechodzi po literach i sprawdza czy kazda z nich jest w linii
+	every i:=1 to *letters do {
+		ok:=0
+		every k:=1 to *line do {
+			if letters[i]==line[k] then {
+				ok:=1
+				break
+			}
+		}
+		if ok==0 then return 0
+	}
+	return 1
+end
+
+procedure findNewExpression(L,line)
+	setOfChars := ("~^&|>()" || line**&lcase) #generuje litery z wyrazenia i laczy go z dostepnymi znakami
+	every k:=(*(line**&lcase))*2-1 to *line do { #przechodzimy od ilosci liter w wyrazeniu do dlugosci tego wyrazenia, poniewaz i tak porownujemy 01 ciagi ktore sa dlugosci takiej ile mamy liter w wyrazeniu
+		every expression:= generateExpression(k,setOfChars) do { #generujemy nowe wyrazenie
+			if isEveryLetter(expression,line**&lcase)==0 then next #sprawdz czy sa wszystkie litery (przyspiesza to bardzo funkcje)
+			ifOkExpression:=check2(expression) #sprawdamy czy poprawne
+			if ifOkExpression~=="1" then next #jezeli nie to generujemy nastepne
+			expressionONP:=onp(expression)
+			M:=set()
+			every i:=toBinary(*(expressionONP**&lcase)) do { #wytworzenie 0 i 1
+				if solveExpression(expressionONP,i)~==0 then insert(M,i) #jezeli wyrazenie bedzie mialo wartosc rozna od 0 to trafia do zbioru (bo moga byc tez wartosci neiznane)
+			}
+			if equalExpressions(L,M)==1 then return expression #porownujemy czy 01 ciagi sa takie same i jesli tak to zwracamy to wyrazenie
+		}
+	}
+	return line #jezeli ciagi beda rozne to zwracamy wyrazenie podstawowe
+end
+
+procedure createNewExpression(line)
+	firstLine:=line #zachowanie orginalnej linii
+	line:=onp(line) #przetworzenie linii do odwrotnej notacji polskiej
+	L:=set() #zbior w ktorym przechowujemu 01 ciag do porownania, w ktorym beda sie znajdowac tylko ciagi o wartosci 0 dla danego wyrazenia
+	every i:=toBinary(*(line**&lcase)) do { #wytworzenie 0 i 1
+		if solveExpression(line,i)~==0 then insert(L,i) #jezeli wyrazenie bedzie mialo wartosc rozna od 0 to trafia do zbioru (bo moga byc tez wartosci neiznane)
+	}
+	if not (solveExpression(line,toBinary(*(line**&lcase))) = 0) then finalExpression:="T" #jezeli wyrazenie bd zawsze prawdziwe to odrazu przypisujemy T
+	else finalExpression:=findNewExpression(L,firstLine) #szukanie najkrotszego wyrazenia
+	return finalExpression
+end
+
+procedure goToReduce2(L)
+	newL:=[]
+	every line:=!L do { #przechodzenie po kazdym wyrazeniu
+		line2:=check(line) #sprawdzenie poprawnosci danych wejsciowych
+		if line2~=="ERROR" then {
+			checkingNumber:=check2(line2) #drugie sprawdzenie czy wyrazenie jest poprawne
+			if checkingNumber=="1" then line2:=createNewExpression(line2) #jezeli to jest poprawne wyrazenie to przechodzimy do redukcji
+		}
+		#write(line2)
+		#insert(newL,line2)
+		push(newL,line2)
+	}
+	return newL 
+end
